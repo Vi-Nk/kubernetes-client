@@ -3,25 +3,32 @@
  */
 package example.app;
 
-import java.io.IOException;
 import java.nio.file.Path;
 
-import dev.vink.k8sclient.config.KubeConfig;
-import dev.vink.k8sclient.config.KubeConfigReader;
+import dev.vink.k8sclient.auth.*;
+import dev.vink.k8sclient.config.*;
+import dev.vink.k8sclient.config.KubeConfig.*;
+import dev.vink.k8sclient.http.*;
 
 public class App {
-    public String getGreeting() {
-        return "Hello World!";
-    }
 
     public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
-        KubeConfigReader reader = new KubeConfigReader();
         try {
+            KubeConfigReader reader = new KubeConfigReader();
             KubeConfig config = reader.fromPath(Path.of("C:\\Users\\Public\\Desktop\\.kube\\config"));
             System.out.println(config.getApiVersion());
             System.out.println(config.getClusters().get(0).getCluster().getServer());
-        } catch (IOException e) {
+
+            // test Connection with Auth Provider
+            UserData user = config.getUsers().get(0).getUser();
+            ClusterData cluster = config.getClusters().get(0).getCluster();
+            AuthProvider auth = new TLSAuthProvider(cluster.getCertificateAuthorityData(),
+                    user.getClientCertificateData(), user.getClientKeyData());
+
+            KubernetesHttpClient client = new KubernetesHttpClient(cluster.getServer(), auth.getSslSocketFactory());
+            String resp = client.get("/api/v1/namespaces/default/pods");
+            System.out.println(resp);
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
